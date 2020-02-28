@@ -1,0 +1,49 @@
+#
+# Copyright (C) 2019-2020
+# 
+# Author: Prem Mallappa<prem.mallappa@gmail.com>
+#
+
+Import('env')
+
+exluded_srcs = []
+
+# Get all Linux files, excluding the list
+old_excludes = Glob('*_old.c') + Glob("*orig") + \
+            Glob('*linux.c') + Glob('*win.c') 
+
+import fnmatch
+import os
+
+matches = []
+for root, dirnames, filenames in os.walk('.'):
+     for filename in fnmatch.filter(filenames, '*.c'):
+          matches.append(Glob(
+               os.path.join(root, filename)[len(root)+1:]
+               ))
+
+print("matched: ", matches)
+excluded_list = exluded_srcs + [f.name for f in old_excludes]
+
+tkit_srcs_all = Glob('*.c', exclude=excluded_list)
+
+#print("tkit_srcs:", [f.name for f in tkit_srcs_all], "excluded list:", excluded_list)
+
+tkit_srcs = [x for x in tkit_srcs_all if x not in excluded_list]
+qom_srcs = Glob('qom/*.c', exclude=excluded_list)
+
+
+# Avoid error for the following
+# src/qom/gslist.c:597:35: warning: cast between incompatible function types from 'GCompareFunc' {aka 'int (*)(const void *, const void *)'} to 'void (*)(void *, void *)' [-Wcast-function-type]
+#   return g_slist_sort_real (list, (GFunc) compare_func, FALSE, NULL);
+tkenv = env.Clone()
+tkenv.Append(
+     CFLAGS = [
+          '-Wno-cast-function-type',
+		'-Wno-error=cast-function-type'
+          ]
+)
+
+libtkit_a = tkenv.StaticLibrary('libtestkit', qom_srcs + tkit_srcs)
+
+Return('libtkit_a')
